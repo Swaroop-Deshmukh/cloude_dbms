@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4">
+    <div class="max-w-4xl w-full">
+        <div class="text-center text-white mb-12">
+            <svg class="w-24 h-24 mx-auto mb-6" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6z"/>
+            </svg>
+            <h1 class="text-5xl font-bold mb-4">Blood Bank Management System</h1>
+            <p class="text-xl text-red-100">Save lives, one donation at a time</p>
+        </div>
+        
+        <div class="grid md:grid-cols-3 gap-6 mb-12">
+            <div class="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-white text-center">
+                <div class="text-4xl font-bold mb-2">866+</div>
+                <div class="text-red-100">Active Donors</div>
+            </div>
+            <div class="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-white text-center">
+                <div class="text-4xl font-bold mb-2">450+</div>
+                <div class="text-red-100">Units Available</div>
+            </div>
+            <div class="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-white text-center">
+                <div class="text-4xl font-bold mb-2">5000+</div>
+                <div class="text-red-100">Lives Saved</div>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <a href="{{ url_for('login') }}" 
+               class="inline-block bg-white text-red-600 px-8 py-4 rounded-lg text-lg font-bold hover:bg-red-50 transition-colors shadow-lg">
+                Staff Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

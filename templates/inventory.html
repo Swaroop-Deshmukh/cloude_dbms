@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <!-- Sidebar (same structure) -->
+    <div class="w-64 bg-red-700 text-white flex flex-col">
+        <div class="p-4 border-b border-red-600">
+            <div class="flex items-center space-x-2">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6z"/>
+                </svg>
+                <span class="font-bold text-lg">BloodBank</span>
+            </div>
+        </div>
+        
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{{ url_for('donors') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <span>Donors</span>
+            </a>
+            
+            <a href="{{ url_for('inventory') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-800">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span>Inventory</span>
+            </a>
+            
+            <a href="{{ url_for('requests_page') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Requests</span>
+            </a>
+        </nav>
+        
+        <div class="p-4 border-t border-red-600">
+            <a href="{{ url_for('logout') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white border-b border-gray-200 px-6 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">Blood Inventory</h1>
+            <p class="text-sm text-gray-500 mt-1">Real-time stock levels by blood group and component</p>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-6">
+            <!-- Inventory Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Blood Group</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">Whole Blood</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">RBC</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">Plasma</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">Platelets</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">Cryoprecipitate</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">Total Units</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                            <tr>
+                                <td colspan="7" class="px-6 py-12 text-center">
+                                    <div class="spinner"></div>
+                                    <p class="text-gray-500 mt-2">Loading inventory...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Total Units Available</h3>
+                    <p class="text-3xl font-bold text-gray-800" id="totalUnitsInventory">-</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Critical Stock Items</h3>
+                    <p class="text-3xl font-bold text-red-600" id="criticalCount">-</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">Blood Groups Tracked</h3>
+                    <p class="text-3xl font-bold text-gray-800">8</p>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadInventory();
+});
+
+async function loadInventory() {
+    try {
+        console.log('Loading inventory...');
+        const inventory = await API.getInventory();
+        console.log('Inventory received:', inventory);
+        
+        // Group by blood group
+        const groupedInventory = {};
+        inventory.forEach(item => {
+            if (!groupedInventory[item.blood_group]) {
+                groupedInventory[item.blood_group] = {};
+            }
+            groupedInventory[item.blood_group][item.component_type] = item.units_available;
+        });
+        
+        const tbody = document.getElementById('inventoryTableBody');
+        const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+        let totalUnits = 0;
+        let criticalCount = 0;
+        
+        tbody.innerHTML = bloodGroups.map(bg => {
+            const wholeBlood = groupedInventory[bg]?.['Whole Blood'] || 0;
+            const rbc = groupedInventory[bg]?.['RBC'] || 0;
+            const plasma = groupedInventory[bg]?.['Plasma'] || 0;
+            const platelets = groupedInventory[bg]?.['Platelets'] || 0;
+            const cryo = groupedInventory[bg]?.['Cryoprecipitate'] || 0;
+            const total = wholeBlood + rbc + plasma + platelets + cryo;
+            
+            totalUnits += total;
+            
+            // Count critical items (< 5 units)
+            if (wholeBlood < 5) criticalCount++;
+            if (rbc < 5) criticalCount++;
+            if (plasma < 5) criticalCount++;
+            if (platelets < 5) criticalCount++;
+            if (cryo < 5) criticalCount++;
+            
+            return `
+                <tr class="table-row-hover border-b border-gray-100">
+                    <td class="px-6 py-4">
+                        <span class="blood-badge">${bg}</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${getStockStatusColor(wholeBlood)}">
+                            ${Math.round(wholeBlood)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${getStockStatusColor(rbc)}">
+                            ${Math.round(rbc)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${getStockStatusColor(plasma)}">
+                            ${Math.round(plasma)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${getStockStatusColor(platelets)}">
+                            ${Math.round(platelets)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${getStockStatusColor(cryo)}">
+                            ${Math.round(cryo)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="font-bold text-gray-800">${Math.round(total)}</span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Update summary stats
+        document.getElementById('totalUnitsInventory').textContent = Math.round(totalUnits);
+        document.getElementById('criticalCount').textContent = criticalCount;
+        
+    } catch (error) {
+        console.error('Failed to load inventory:', error);
+        document.getElementById('inventoryTableBody').innerHTML = 
+            '<tr><td colspan="7" class="px-6 py-8 text-center text-red-500">Failed to load inventory. Please refresh.</td></tr>';
+    }
+}
+</script>
+{% endblock %}

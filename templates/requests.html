@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <!-- Sidebar (same structure) -->
+    <div class="w-64 bg-red-700 text-white flex flex-col">
+        <div class="p-4 border-b border-red-600">
+            <div class="flex items-center space-x-2">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6z"/>
+                </svg>
+                <span class="font-bold text-lg">BloodBank</span>
+            </div>
+        </div>
+        
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{{ url_for('donors') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <span>Donors</span>
+            </a>
+            
+            <a href="{{ url_for('inventory') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span>Inventory</span>
+            </a>
+            
+            <a href="{{ url_for('requests_page') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-800">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Requests</span>
+            </a>
+        </nav>
+        
+        <div class="p-4 border-t border-red-600">
+            <a href="{{ url_for('logout') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white border-b border-gray-200 px-6 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">Hospital Requests</h1>
+            <p class="text-sm text-gray-500 mt-1">Manage blood component requests from hospitals</p>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-6">
+            <!-- Requests Grid -->
+            <div id="requestsContainer">
+                <div class="flex justify-center py-12">
+                    <div class="spinner"></div>
+                    <p class="text-gray-500 ml-3">Loading requests...</p>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-12">
+                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-600 mb-2">No Pending Requests</h3>
+                <p class="text-gray-500">All hospital requests have been fulfilled! 🎉</p>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Fulfill Request Modal -->
+<div id="fulfillModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full m-4">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-800">Fulfill Request</h2>
+        </div>
+        
+        <div class="p-6">
+            <form id="fulfillForm">
+                <input type="hidden" id="requestId">
+                <input type="hidden" id="maxUnits">
+                
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 mb-2">Request ID: <span id="modalRequestId" class="font-bold"></span></p>
+                    <p class="text-sm text-gray-600 mb-2">Hospital: <span id="modalHospital" class="font-bold"></span></p>
+                    <p class="text-sm text-gray-600 mb-4">Requested: <span id="modalUnitsRequested" class="font-bold"></span> units</p>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Units to Supply *</label>
+                    <input type="number" id="unitsToSupply" min="1" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                    <p class="text-xs text-gray-500 mt-1">Maximum available: <span id="modalMaxUnits"></span> units</p>
+                </div>
+                
+                <div class="flex items-center justify-end space-x-4">
+                    <button type="button" onclick="closeFulfillModal()"
+                            class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        Fulfill Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let allRequests = [];
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadRequests();
+});
+
+async function loadRequests() {
+    try {
+        const requests = await API.getPendingRequests();
+        allRequests = requests;
+        displayRequests(requests);
+    } catch (error) {
+        document.getElementById('requestsContainer').innerHTML = 
+            '<div class="text-center py-12"><p class="text-red-500">Failed to load requests. Please refresh.</p></div>';
+    }
+}
+
+function displayRequests(requests) {
+    const container = document.getElementById('requestsContainer');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (requests.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+    
+    container.innerHTML = requests.map(request => `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-4 fade-in">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-4 mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">${request.Hospital_Name}</h3>
+                        ${request.fulfillment_status === 'Can Fulfill' 
+                            ? '<span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">✓ Can Fulfill</span>'
+                            : '<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">⚠ Insufficient Stock</span>'
+                        }
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">Request ID</p>
+                            <p class="font-medium text-gray-800">#${request.Request_ID}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">Blood Group</p>
+                            <span class="blood-badge">${request.Blood_Group}</span>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">Component</p>
+                            <p class="font-medium text-gray-800">${request.Component_Type}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">Units Requested</p>
+                            <p class="font-medium text-gray-800">${request.Units_Requested} units</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">Available Stock</p>
+                            <p class="font-medium ${request.Stock_Available >= request.Units_Requested ? 'text-green-600' : 'text-red-600'}">
+                                ${Math.round(request.Stock_Available)} units
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                ${request.fulfillment_status === 'Can Fulfill' 
+                    ? `<button onclick="openFulfillModal(${request.Request_ID}, '${request.Hospital_Name}', ${request.Units_Requested}, ${request.Stock_Available})"
+                              class="ml-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-medium whitespace-nowrap">
+                        Fulfill Request
+                      </button>`
+                    : `<button disabled
+                              class="ml-4 bg-gray-300 text-gray-500 px-6 py-2 rounded-lg cursor-not-allowed font-medium whitespace-nowrap">
+                        Insufficient Stock
+                      </button>`
+                }
+            </div>
+        </div>
+    `).join('');
+}
+
+function openFulfillModal(requestId, hospitalName, unitsRequested, stockAvailable) {
+    document.getElementById('requestId').value = requestId;
+    document.getElementById('maxUnits').value = Math.min(unitsRequested, stockAvailable);
+    document.getElementById('modalRequestId').textContent = '#' + requestId;
+    document.getElementById('modalHospital').textContent = hospitalName;
+    document.getElementById('modalUnitsRequested').textContent = unitsRequested;
+    document.getElementById('modalMaxUnits').textContent = Math.round(Math.min(unitsRequested, stockAvailable));
+    document.getElementById('unitsToSupply').max = Math.min(unitsRequested, stockAvailable);
+    document.getElementById('unitsToSupply').value = Math.min(unitsRequested, stockAvailable);
+    document.getElementById('fulfillModal').classList.remove('hidden');
+}
+
+function closeFulfillModal() {
+    document.getElementById('fulfillModal').classList.add('hidden');
+    document.getElementById('fulfillForm').reset();
+}
+
+document.getElementById('fulfillForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const requestId = document.getElementById('requestId').value;
+    const unitsToSupply = parseFloat(document.getElementById('unitsToSupply').value);
+    const maxUnits = parseFloat(document.getElementById('maxUnits').value);
+    
+    if (unitsToSupply > maxUnits) {
+        alert('Cannot supply more units than available!');
+        return;
+    }
+    
+    try {
+        const result = await API.fulfillRequest(requestId, unitsToSupply);
+        showNotification('Request fulfilled successfully!', 'success');
+        closeFulfillModal();
+        loadRequests(); // Reload the requests
+    } catch (error) {
+        showNotification('Failed to fulfill request: ' + error.message, 'error');
+    }
+});
+
+loadRequests();
+</script>
+{% endblock %}
+```
+
+## 🎉 **Summary of Changes:**
+
+### ✅ **What's Now Connected to Database:**
+
+1. **Dashboard** - Shows real donor count (867), real stock units, real pending requests
+2. **Donors** - Displays all 867 donors from your database with search functionality
+3. **Inventory** - Shows actual blood stock from `Blood_Stock` table
+4. **Requests** - Displays pending hospital requests with fulfill functionality
+
+### 🔄 **How Data Flows:**
+```
+HTML Template → JavaScript (API.call) → Flask Route → MySQL Database → JSON Response → Display in UI

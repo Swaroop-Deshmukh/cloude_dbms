@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <!-- Sidebar -->
+    <div class="w-64 bg-red-700 text-white flex flex-col">
+        <div class="p-4 border-b border-red-600">
+            <div class="flex items-center space-x-2">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6z"/>
+                </svg>
+                <span class="font-bold text-lg">BloodBank</span>
+            </div>
+        </div>
+        
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-800">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{{ url_for('donors') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <span>Donors</span>
+            </a>
+            
+            <a href="{{ url_for('inventory') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span>Inventory</span>
+            </a>
+            
+            <a href="{{ url_for('requests_page') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Requests</span>
+            </a>
+        </nav>
+        
+        <div class="p-4 border-t border-red-600">
+            <a href="{{ url_for('logout') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-100 hover:bg-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white border-b border-gray-200 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+                    <p class="text-sm text-gray-500">Overview of blood bank operations</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-sm font-medium text-gray-700">{{ session.username }}</p>
+                        <p class="text-xs text-gray-500">{{ session.role }}</p>
+                    </div>
+                    <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-bold">
+                        {{ session.username[0].upper() }}
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total Donors</p>
+                            <p class="text-3xl font-bold text-gray-800 mt-2" id="totalDonors">
+                                <div class="spinner"></div>
+                            </p>
+                        </div>
+                        <div class="bg-blue-500 p-4 rounded-lg">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Units in Stock</p>
+                            <p class="text-3xl font-bold text-gray-800 mt-2" id="totalUnits">
+                                <div class="spinner"></div>
+                            </p>
+                        </div>
+                        <div class="bg-red-500 p-4 rounded-lg">
+                            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Pending Requests</p>
+                            <p class="text-3xl font-bold text-gray-800 mt-2" id="pendingRequests">
+                                <div class="spinner"></div>
+                            </p>
+                        </div>
+                        <div class="bg-yellow-500 p-4 rounded-lg">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Donations This Month</p>
+                            <p class="text-3xl font-bold text-gray-800 mt-2">124</p>
+                        </div>
+                        <div class="bg-green-500 p-4 rounded-lg">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Low Stock Alerts -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+                <div class="p-6 border-b border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-bold text-gray-800">Low Stock Alerts</h2>
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div id="lowStockAlerts">
+                        <div class="flex justify-center py-8">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardStats();
+});
+
+async function loadDashboardStats() {
+    try {
+        console.log('Loading dashboard stats...');
+        const data = await API.getDashboardStats();
+        console.log('Dashboard data received:', data);
+        
+        // Update stats
+        document.getElementById('totalDonors').textContent = data.stats.total_donors;
+        document.getElementById('totalUnits').textContent = Math.round(data.stats.total_units_in_stock);
+        document.getElementById('pendingRequests').textContent = data.stats.pending_hospital_requests;
+        
+        // Display low stock alerts
+        const alertsDiv = document.getElementById('lowStockAlerts');
+        if (data.low_stock_alerts.length === 0) {
+            alertsDiv.innerHTML = '<p class="text-center text-gray-500 py-4">No low stock alerts - All inventory levels are healthy! 🎉</p>';
+        } else {
+            alertsDiv.innerHTML = data.low_stock_alerts.map(alert => `
+                <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200 mb-3 fade-in">
+                    <div>
+                        <p class="font-bold text-gray-800">${alert.Blood_Group} - ${alert.Component_Type}</p>
+                        <p class="text-sm text-gray-600">${alert.Units_Available} units remaining</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                        alert.stock_status === 'Critical' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'
+                    }">
+                        ${alert.stock_status}
+                    </span>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load dashboard stats:', error);
+        document.getElementById('totalDonors').textContent = 'Error';
+        document.getElementById('totalUnits').textContent = 'Error';
+        document.getElementById('pendingRequests').textContent = 'Error';
+        document.getElementById('lowStockAlerts').innerHTML = 
+            '<p class="text-center text-red-500 py-4">Failed to load data. Please refresh the page.</p>';
+    }
+}
+</script>
+{% endblock %}
+
