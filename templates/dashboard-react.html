@@ -5,17 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BloodBank Management System</title>
     
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -27,1026 +23,1232 @@
         // API Base URL
         const API_BASE = 'http://localhost:5000/api';
 
+        // --- Utility Function to Handle API Calls ---
+        const safeFetch = async (url) => {
+            const response = await fetch(url, { credentials: 'include' });
+
+            if (response.status === 401) {
+                // Critical: Unauthorized. Prompt user and redirect to login.
+                console.error(`Unauthorized access to ${url}. Redirecting to login.`);
+                alert("Session expired or unauthorized. Please log in again.");
+                window.location.href = '/login'; // Redirect to Flask login route
+                return { isError: true, data: {} };
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error(`API Error on ${url}:`, data.message || data);
+                return { isError: true, data: data };
+            }
+
+            return { isError: false, data: data };
+        };
+
+
         const BloodBankSystem = () => {
-          const [currentPage, setCurrentPage] = useState('dashboard');
-          const [isLoading, setIsLoading] = useState(false);
-          const [searchQuery, setSearchQuery] = useState('');
-          const [notifications, setNotifications] = useState(3);
-          const [selectedBloodType, setSelectedBloodType] = useState('all');
-          const [showModal, setShowModal] = useState(false);
-          const [modalType, setModalType] = useState('');
-          const [selectedItem, setSelectedItem] = useState(null);
+            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [isLoading, setIsLoading] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [notifications, setNotifications] = useState(3);
+            const [selectedBloodType, setSelectedBloodType] = useState('all');
+            const [showModal, setShowModal] = useState(false);
+            const [modalType, setModalType] = useState('');
+            const [selectedItem, setSelectedItem] = useState(null);
 
-          // Data States
-          const [donors, setDonors] = useState([]);
-          const [inventory, setInventory] = useState([]);
-          const [requests, setRequests] = useState([]);
-          const [stats, setStats] = useState({});
-          const [criticalStock, setCriticalStock] = useState([]);
-          const [recentDonations, setRecentDonations] = useState([]);
-          const [expiringStock, setExpiringStock] = useState([]);
+            // Data States
+            const [donors, setDonors] = useState([]);
+            const [inventory, setInventory] = useState([]);
+            const [requests, setRequests] = useState([]);
+            const [stats, setStats] = useState({});
+            // Initializing criticalStock as an array is a good defensive practice
+            const [criticalStock, setCriticalStock] = useState([]);
+            const [recentDonations, setRecentDonations] = useState([]);
+            const [expiringStock, setExpiringStock] = useState([]);
 
-          const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+            const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
-          // Fetch Dashboard Data
-          const fetchDashboardData = async () => {
-            try {
-              const [statsRes, criticalRes, recentRes, expiringRes] = await Promise.all([
-                fetch(`${API_BASE}/dashboard/stats`, { credentials: 'include' }),
-                fetch(`${API_BASE}/dashboard/critical-stock`, { credentials: 'include' }),
-                fetch(`${API_BASE}/dashboard/recent-donations`, { credentials: 'include' }),
-                fetch(`${API_BASE}/dashboard/expiring-stock`, { credentials: 'include' })
-              ]);
+            // --- CORRECTED: Fetch Dashboard Data with Error Handling ---
+            const fetchDashboardData = async () => {
+                try {
+                    const [statsRes, criticalRes, recentRes, expiringRes] = await Promise.all([
+                        safeFetch(`${API_BASE}/dashboard/stats`),
+                        safeFetch(`${API_BASE}/dashboard/critical-stock`),
+                        safeFetch(`${API_BASE}/dashboard/recent-donations`),
+                        safeFetch(`${API_BASE}/dashboard/expiring-stock`)
+                    ]);
 
-              const statsData = await statsRes.json();
-              setStats(statsData.stats || {});
-              setCriticalStock(await criticalRes.json());
-              setRecentDonations(await recentRes.json());
-              setExpiringStock(await expiringRes.json());
-            } catch (error) {
-              console.error('Error fetching dashboard data:', error);
-            }
-          };
+                    // Stats: Check for success flag in data payload
+                    if (statsRes.data?.success) {
+                        setStats(statsRes.data.stats || {});
+                    } else if (!statsRes.isError) {
+                        setStats({});
+                    }
 
-          // Fetch Donors
-          const fetchDonors = async () => {
-            setIsLoading(true);
-            try {
-              const response = await fetch(
-                `${API_BASE}/donors/all?search=${searchQuery}&blood_type=${selectedBloodType}`,
-                { credentials: 'include' }
-              );
-              const data = await response.json();
-              setDonors(data);
-            } catch (error) {
-              console.error('Error fetching donors:', error);
-            }
-            setIsLoading(false);
-          };
+                    // Critical Stock: Must be an array
+                    if (Array.isArray(criticalRes.data)) {
+                        setCriticalStock(criticalRes.data);
+                    } else if (!criticalRes.isError) {
+                        setCriticalStock([]); 
+                    }
 
-          // Fetch Inventory
-          const fetchInventory = async () => {
-            setIsLoading(true);
-            try {
-              const response = await fetch(`${API_BASE}/inventory/all`, { credentials: 'include' });
-              const data = await response.json();
-              setInventory(data);
-            } catch (error) {
-              console.error('Error fetching inventory:', error);
-            }
-            setIsLoading(false);
-          };
+                    // Recent Donations: Must be an array
+                    if (Array.isArray(recentRes.data)) {
+                        setRecentDonations(recentRes.data);
+                    } else if (!recentRes.isError) {
+                        setRecentDonations([]);
+                    }
 
-          // Fetch Requests
-          const fetchRequests = async () => {
-            setIsLoading(true);
-            try {
-              const response = await fetch(
-                `${API_BASE}/requests/all?search=${searchQuery}`,
-                { credentials: 'include' }
-              );
-              const data = await response.json();
-              setRequests(data);
-            } catch (error) {
-              console.error('Error fetching requests:', error);
-            }
-            setIsLoading(false);
-          };
+                    // Expiring Stock: Must be an array
+                    if (Array.isArray(expiringRes.data)) {
+                        setExpiringStock(expiringRes.data);
+                    } else if (!expiringRes.isError) {
+                        setExpiringStock([]);
+                    }
 
-          // Handle Save Donor (Add/Edit)
-          const handleSaveDonor = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const donorData = {
-              name: formData.get('name'),
-              blood: formData.get('blood'),
-              phone: formData.get('phone'),
-              email: formData.get('email'),
-              location: formData.get('location'),
-              dob: formData.get('lastDonation') || '1990-01-01'
+                } catch (error) {
+                    console.error('Error fetching dashboard data:', error);
+                    // Clear all dashboard data on error
+                    setStats({});
+                    setCriticalStock([]);
+                    setRecentDonations([]);
+                    setExpiringStock([]);
+                }
             };
 
-            try {
-              const url = selectedItem 
-                ? `${API_BASE}/donors/update/${selectedItem.id}`
-                : `${API_BASE}/donors/add`;
-              
-              const response = await fetch(url, {
-                method: selectedItem ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(donorData)
-              });
-
-              const result = await response.json();
-              if (result.success) {
-                alert(result.message);
-                closeModal();
-                fetchDonors();
-              } else {
-                alert('Error: ' + result.message);
-              }
-            } catch (error) {
-              console.error('Error saving donor:', error);
-              alert('Failed to save donor');
-            }
-          };
-
-          // Handle Delete Donor
-          const handleDeleteDonor = async (donorId) => {
-            if (!confirm('Are you sure you want to delete this donor?')) return;
-
-            try {
-              const response = await fetch(`${API_BASE}/donors/delete/${donorId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-              });
-
-              const result = await response.json();
-              if (result.success) {
-                alert(result.message);
-                fetchDonors();
-              } else {
-                alert('Error: ' + result.message);
-              }
-            } catch (error) {
-              console.error('Error deleting donor:', error);
-              alert('Failed to delete donor');
-            }
-          };
-
-          // Handle Add Request
-          const handleAddRequest = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const requestData = {
-              patient: formData.get('patient'),
-              blood: formData.get('blood'),
-              units: formData.get('units'),
-              hospital: formData.get('hospital'),
-              notes: formData.get('notes')
+            // Fetch Donors
+            const fetchDonors = async () => {
+                setIsLoading(true);
+                try {
+                    const { isError, data } = await safeFetch(
+                        `${API_BASE}/donors/all?search=${searchQuery}&blood_type=${selectedBloodType}`
+                    );
+                    // The donors API returns an array directly on success
+                    if (!isError && Array.isArray(data)) { 
+                        setDonors(data);
+                    } else {
+                        setDonors([]);
+                    }
+                } catch (error) {
+                    console.error('Error fetching donors:', error);
+                    setDonors([]);
+                }
+                setIsLoading(false);
             };
 
-            try {
-              const response = await fetch(`${API_BASE}/requests/add`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(requestData)
-              });
+            // Fetch Inventory
+            const fetchInventory = async () => {
+                setIsLoading(true);
+                try {
+                    const { isError, data } = await safeFetch(`${API_BASE}/inventory/all`);
+                    // The inventory API returns an array directly on success
+                    if (!isError && Array.isArray(data)) {
+                        setInventory(data);
+                    } else {
+                        setInventory([]);
+                    }
+                } catch (error) {
+                    console.error('Error fetching inventory:', error);
+                    setInventory([]);
+                }
+                setIsLoading(false);
+            };
 
-              const result = await response.json();
-              if (result.success) {
-                alert(result.message);
-                closeModal();
-                fetchRequests();
-                fetchDashboardData();
-              } else {
-                alert('Error: ' + result.message);
-              }
-            } catch (error) {
-              console.error('Error adding request:', error);
-              alert('Failed to add request');
-            }
-          };
+            // Fetch Requests
+            const fetchRequests = async () => {
+                setIsLoading(true);
+                try {
+                    const { isError, data } = await safeFetch(
+                        `${API_BASE}/requests/all?search=${searchQuery}`
+                    );
+                    // The requests API returns an array directly on success
+                    if (!isError && Array.isArray(data)) {
+                        setRequests(data);
+                    } else {
+                        setRequests([]);
+                    }
+                } catch (error) {
+                    console.error('Error fetching requests:', error);
+                    setRequests([]);
+                }
+                setIsLoading(false);
+            };
 
-          // Handle Approve Request
-          const handleApproveRequest = async (requestId) => {
-            try {
-              const response = await fetch(`${API_BASE}/requests/approve/${requestId}`, {
-                method: 'POST',
-                credentials: 'include'
-              });
+            // --- All other handler functions (handleSaveDonor, handleDeleteDonor, etc.) remain the same
+            // as they use standard fetch/response.json(). The safeFetch utility handles 401 globally,
+            // and their logic already checks the 'success' flag from Flask. ---
 
-              const result = await response.json();
-              if (result.success) {
-                alert(result.message);
-                closeModal();
-                fetchRequests();
-                fetchDashboardData();
-              } else {
-                alert('Error: ' + result.message);
-              }
-            } catch (error) {
-              console.error('Error approving request:', error);
-              alert('Failed to approve request');
-            }
-          };
+            // Handle Save Donor (Add/Edit)
+            const handleSaveDonor = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const donorData = {
+                    name: formData.get('name'),
+                    blood: formData.get('blood'),
+                    phone: formData.get('phone'),
+                    email: formData.get('email'),
+                    location: formData.get('location'),
+                    dob: formData.get('lastDonation') || '1990-01-01'
+                };
 
-          // Handle Reject Request
-          const handleRejectRequest = async (requestId) => {
-            try {
-              const response = await fetch(`${API_BASE}/requests/reject/${requestId}`, {
-                method: 'POST',
-                credentials: 'include'
-              });
+                try {
+                    const url = selectedItem 
+                        ? `${API_BASE}/donors/update/${selectedItem.id}`
+                        : `${API_BASE}/donors/add`;
+                    
+                    const response = await fetch(url, {
+                        method: selectedItem ? 'PUT' : 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(donorData)
+                    });
 
-              const result = await response.json();
-              if (result.success) {
-                alert(result.message);
-                closeModal();
-                fetchRequests();
-              } else {
-                alert('Error: ' + result.message);
-              }
-            } catch (error) {
-              console.error('Error rejecting request:', error);
-              alert('Failed to reject request');
-            }
-          };
+                    // Check for 401 explicitly since safeFetch isn't used here
+                    if (response.status === 401) {
+                        alert("Session expired or unauthorized. Please log in again.");
+                        window.location.href = '/login';
+                        return;
+                    }
 
-          // UseEffects
-          useEffect(() => {
-            if (currentPage === 'dashboard') {
-              fetchDashboardData();
-            } else if (currentPage === 'donors') {
-              fetchDonors();
-            } else if (currentPage === 'inventory') {
-              fetchInventory();
-            } else if (currentPage === 'requests') {
-              fetchRequests();
-            }
-          }, [currentPage]);
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        closeModal();
+                        fetchDonors();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error saving donor:', error);
+                    alert('Failed to save donor');
+                }
+            };
+            
+            // Handle Delete Donor
+            const handleDeleteDonor = async (donorId) => {
+                if (!confirm('Are you sure you want to delete this donor?')) return;
 
-          useEffect(() => {
-            if (currentPage === 'donors') {
-              const timer = setTimeout(() => fetchDonors(), 500);
-              return () => clearTimeout(timer);
-            } else if (currentPage === 'requests') {
-              const timer = setTimeout(() => fetchRequests(), 500);
-              return () => clearTimeout(timer);
-            }
-          }, [searchQuery, selectedBloodType]);
+                try {
+                    const response = await fetch(`${API_BASE}/donors/delete/${donorId}`, {
+                        method: 'DELETE',
+                        credentials: 'include'
+                    });
 
-          const openModal = (type, item = null) => {
-            setModalType(type);
-            setSelectedItem(item);
-            setShowModal(true);
-          };
+                    if (response.status === 401) {
+                        alert("Session expired or unauthorized. Please log in again.");
+                        window.location.href = '/login';
+                        return;
+                    }
 
-          const closeModal = () => {
-            setShowModal(false);
-            setModalType('');
-            setSelectedItem(null);
-          };
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        fetchDonors();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error deleting donor:', error);
+                    alert('Failed to delete donor');
+                }
+            };
 
-          // Modal Component
-          const Modal = ({ type, item }) => (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                      {type === 'addDonor' && 'Add New Donor'}
-                      {type === 'editDonor' && 'Edit Donor'}
-                      {type === 'addRequest' && 'New Blood Request'}
-                      {type === 'viewDetails' && 'Request Details'}
-                    </h2>
-                    <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
-                      <i data-lucide="x-circle" className="w-6 h-6"></i>
-                    </button>
-                  </div>
+            // Handle Add Request
+            const handleAddRequest = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const requestData = {
+                    patient: formData.get('patient'),
+                    blood: formData.get('blood'),
+                    units: formData.get('units'),
+                    hospital: formData.get('hospital'),
+                    notes: formData.get('notes')
+                };
 
-                  {(type === 'addDonor' || type === 'editDonor') && (
-                    <form onSubmit={handleSaveDonor} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                          <input name="name" type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.name} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Blood Type</label>
-                          <select name="blood" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.blood}>
-                            {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                          <input name="phone" type="tel" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.phone} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                          <input name="email" type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.email} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                          <input name="location" type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.location} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Last Donation</label>
-                          <input name="lastDonation" type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.lastDonation} />
-                        </div>
-                      </div>
-                      <div className="flex gap-3 mt-6">
-                        <button type="submit" className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
-                          {type === 'addDonor' ? 'Add Donor' : 'Update Donor'}
-                        </button>
-                        <button type="button" onClick={closeModal} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                try {
+                    const response = await fetch(`${API_BASE}/requests/add`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(requestData)
+                    });
 
-                  {type === 'addRequest' && (
-                    <form onSubmit={handleAddRequest} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
-                          <input name="patient" type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Blood Type</label>
-                          <select name="blood" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                            {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Units Needed</label>
-                          <input name="units" type="number" required min="1" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Hospital</label>
-                          <input name="hospital" type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
-                        <textarea name="notes" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" rows="3"></textarea>
-                      </div>
-                      <div className="flex gap-3 mt-6">
-                        <button type="submit" className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
-                          Submit Request
-                        </button>
-                        <button type="button" onClick={closeModal} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                    if (response.status === 401) {
+                        alert("Session expired or unauthorized. Please log in again.");
+                        window.location.href = '/login';
+                        return;
+                    }
 
-                  {type === 'viewDetails' && item && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600">Patient Name</p>
-                          <p className="font-semibold">{item.patient}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600">Blood Type</p>
-                          <p className="font-semibold text-red-600">{item.blood}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600">Units Required</p>
-                          <p className="font-semibold">{item.units} units</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600">Hospital</p>
-                          <p className="font-semibold">{item.hospital}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600">Contact</p>
-                          <p className="font-semibold">{item.contact}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600">Status</p>
-                          <p className="font-semibold">{item.status}</p>
-                        </div>
-                      </div>
-                      {item.status === 'pending' && (
-                        <div className="flex gap-3 mt-6">
-                          <button onClick={() => handleApproveRequest(item.id)} className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
-                            <i data-lucide="check-circle" className="w-5 h-5"></i> Approve
-                          </button>
-                          <button onClick={() => handleRejectRequest(item.id)} className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2">
-                            <i data-lucide="x-circle" className="w-5 h-5"></i> Reject
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        closeModal();
+                        fetchRequests();
+                        fetchDashboardData();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error adding request:', error);
+                    alert('Failed to add request');
+                }
+            };
 
-          // Sidebar Component
-          const Sidebar = () => (
-            <div className="w-64 bg-gradient-to-b from-red-600 to-red-700 text-white h-screen flex flex-col shadow-2xl">
-              <div className="p-6 border-b border-red-500">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                    <i data-lucide="droplet" className="text-red-600 w-6 h-6"></i>
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold">BloodBank</h1>
-                    <p className="text-xs text-red-100">Management System</p>
-                  </div>
-                </div>
-              </div>
+            // Handle Approve Request
+            const handleApproveRequest = async (requestId) => {
+                try {
+                    const response = await fetch(`${API_BASE}/requests/approve/${requestId}`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
 
-              <nav className="flex-1 p-4">
-                {[
-                  { id: 'dashboard', icon: 'activity', label: 'Dashboard' },
-                  { id: 'donors', icon: 'users', label: 'Donors' },
-                  { id: 'inventory', icon: 'package', label: 'Inventory' },
-                  { id: 'requests', icon: 'file-text', label: 'Requests' }
-                ].map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => setCurrentPage(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition ${
-                      currentPage === item.id ? 'bg-white text-red-600 shadow-lg' : 'hover:bg-red-500'
-                    }`}
-                  >
-                    <i data-lucide={item.icon} className="w-5 h-5"></i>
-                    <span className="font-medium">{item.label}</span>
-                  </button>
-                ))}
-              </nav>
+                    if (response.status === 401) {
+                        alert("Session expired or unauthorized. Please log in again.");
+                        window.location.href = '/login';
+                        return;
+                    }
 
-              <div className="p-4 border-t border-red-500">
-                <a href="/logout" className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500 transition">
-                  <i data-lucide="log-out" className="w-5 h-5"></i>
-                  <span>Logout</span>
-                </a>
-              </div>
-            </div>
-          );
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        closeModal();
+                        fetchRequests();
+                        fetchDashboardData();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error approving request:', error);
+                    alert('Failed to approve request');
+                }
+            };
 
-          // Header Component
-          const Header = () => (
-            <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800 capitalize">{currentPage}</h2>
-                  <p className="text-sm text-gray-500">
-                    {currentPage === 'dashboard' && 'Overview of blood bank operations'}
-                    {currentPage === 'donors' && 'Manage donor information and records'}
-                    {currentPage === 'inventory' && 'Monitor blood stock and inventory'}
-                    {currentPage === 'requests' && 'Handle blood requests and approvals'}
-                  </p>
-                </div>
+            // Handle Reject Request
+            const handleRejectRequest = async (requestId) => {
+                try {
+                    const response = await fetch(`${API_BASE}/requests/reject/${requestId}`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
 
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                      <i data-lucide="bell" className="w-5 h-5"></i>
-                      {notifications > 0 && (
-                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                      )}
-                    </button>
-                  </div>
+                    if (response.status === 401) {
+                        alert("Session expired or unauthorized. Please log in again.");
+                        window.location.href = '/login';
+                        return;
+                    }
 
-                  <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-700">Admin User</p>
-                      <p className="text-xs text-gray-500">admin@bloodbank.com</p>
-                    </div>
-                    <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-bold">
-                      A
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        closeModal();
+                        fetchRequests();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error rejecting request:', error);
+                    alert('Failed to reject request');
+                }
+            };
 
-          // Dashboard Component
-          const Dashboard = () => (
-            <div className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-4 gap-6">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="text-blue-100 text-sm">Total Donors</p>
-                      <h3 className="text-4xl font-bold mt-2">{stats.totalDonors || 0}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-                      <i data-lucide="users" className="w-6 h-6"></i>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-blue-100">
-                    <i data-lucide="trending-up" className="w-4 h-4"></i>
-                    <span>+12% from last month</span>
-                  </div>
-                </div>
+            // Handle Export Inventory Data (no change needed)
+            const handleExportInventory = () => {
+                try {
+                    let csvContent = "Blood Type,Units Available,Expiring Soon,Last Updated\n";
+                    
+                    inventory.forEach(item => {
+                        csvContent += `${item.blood},${item.units},${item.expiring},"${item.lastUpdated}"\n`;
+                    });
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `blood_inventory_${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    alert('Inventory exported successfully!');
+                } catch (error) {
+                    console.error('Error exporting inventory:', error);
+                    alert('Failed to export inventory');
+                }
+            };
 
-                <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-xl shadow-lg">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="text-red-100 text-sm">Units in Stock</p>
-                      <h3 className="text-4xl font-bold mt-2">{stats.unitsInStock || 0}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-                      <i data-lucide="droplet" className="w-6 h-6"></i>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-red-100">
-                    <i data-lucide="alert-triangle" className="w-4 h-4"></i>
-                    <span>{stats.criticalStock || 0} types critical</span>
-                  </div>
-                </div>
+            // Handle Add Stock (opens modal)
+            const handleAddStock = () => {
+                openModal('addStock');
+            };
 
-                <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-6 rounded-xl shadow-lg">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="text-yellow-100 text-sm">Pending Requests</p>
-                      <h3 className="text-4xl font-bold mt-2">{stats.pendingRequests || 0}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-                      <i data-lucide="file-text" className="w-6 h-6"></i>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-yellow-100">
-                    <i data-lucide="clock" className="w-4 h-4"></i>
-                    <span>2 urgent</span>
-                  </div>
-                </div>
+            // Handle Add Stock Form Submit
+            const handleAddStockSubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const stockData = {
+                    blood_type: formData.get('blood_type'),
+                    units: parseFloat(formData.get('units'))
+                };
 
-                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-xl shadow-lg">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="text-green-100 text-sm">Donations (Month)</p>
-                      <h3 className="text-4xl font-bold mt-2">{stats.donationsThisMonth || 0}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-                      <i data-lucide="trending-up" className="w-6 h-6"></i>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-green-100">
-                    <i data-lucide="trending-up" className="w-4 h-4"></i>
-                    <span>+8% from last month</span>
-                  </div>
-                </div>
-              </div>
+                try {
+                    const response = await fetch(`${API_BASE}/inventory/add-stock`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(stockData)
+                    });
 
-              {/* Critical Alerts */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                      <i data-lucide="alert-triangle" className="text-red-600 w-5 h-5"></i>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">Critical Stock Alerts</h3>
-                  </div>
-                  <button className="text-red-600 hover:text-red-700 font-medium text-sm">View All</button>
-                </div>
+                    if (response.status === 401) {
+                        alert("Session expired or unauthorized. Please log in again.");
+                        window.location.href = '/login';
+                        return;
+                    }
 
-                <div className="space-y-3">
-                  {criticalStock.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">
-                          {item.blood}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-800">{item.blood} Blood Type</p>
-                          <p className="text-sm text-gray-600">{item.units} units remaining • {item.expiring} units expiring soon</p>
-                        </div>
-                      </div>
-                      <span className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg">
-                        Critical
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        closeModal();
+                        fetchInventory();
+                        fetchDashboardData();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error adding stock:', error);
+                    alert('Failed to add stock');
+                }
+            };
 
-              {/* Recent Activity */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Recent Donations</h3>
-                  <div className="space-y-3">
-                    {recentDonations.map((donor, index) => (
-                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                            {donor.name?.charAt(0) || 'D'}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{donor.name}</p>
-                            <p className="text-sm text-gray-500">{donor.blood} • {donor.lastDonation}</p>
-                          </div>
-                        </div>
-                        <span className="text-green-600 text-sm font-medium">Completed</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            // UseEffects
+            useEffect(() => {
+                if (currentPage === 'dashboard') {
+                    fetchDashboardData();
+                } else if (currentPage === 'inventory') {
+                    fetchInventory();
+                }
+            }, [currentPage]);
 
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Upcoming Expirations</h3>
-                  <div className="space-y-3">
-                    {expiringStock.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 font-bold">
-                            {item.blood}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{item.blood} Blood Type</p>
-                            <p className="text-sm text-gray-500">{item.expiring} units expiring in 7 days</p>
-                          </div>
-                        </div>
-                        <i data-lucide="clock" className="text-orange-500 w-5 h-5"></i>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
+            useEffect(() => {
+                if (currentPage === 'donors') {
+                    const timer = setTimeout(() => {
+                        fetchDonors();
+                    }, 500);
+                    return () => clearTimeout(timer);
+                } else if (currentPage === 'requests') {
+                    const timer = setTimeout(() => {
+                        fetchRequests();
+                    }, 500);
+                    return () => clearTimeout(timer);
+                }
+            }, [searchQuery, selectedBloodType, currentPage]);
 
-          // Donors Page Component
-          const DonorsPage = () => {
-            const filteredDonors = donors;
+            const openModal = (type, item = null) => {
+                setModalType(type);
+                setSelectedItem(item);
+                setShowModal(true);
+            };
 
-            return (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="relative flex-1 max-w-md">
-                      <i data-lucide="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
-                      <input
-                        type="text"
-                        placeholder="Search donors by name or email..."
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <select
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                      value={selectedBloodType}
-                      onChange={(e) => setSelectedBloodType(e.target.value)}
-                    >
-                      <option value="all">All Blood Types</option>
-                      {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => openModal('addDonor')}
-                    className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium shadow-md"
-                  >
-                    <i data-lucide="plus" className="w-5 h-5"></i> Add Donor
-                  </button>
-                </div>
+            const closeModal = () => {
+                setShowModal(false);
+                setModalType('');
+                setSelectedItem(null);
+            };
 
-                <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <i data-lucide="refresh-cw" className="animate-spin text-red-600 w-8 h-8"></i>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Donor</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Blood Type</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Donation</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {filteredDonors.map(donor => (
-                            <tr key={donor.id} className="hover:bg-gray-50 transition">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                                    {donor.name?.charAt(0) || 'D'}
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-gray-800">{donor.name}</p>
-                                    <p className="text-sm text-gray-500">{donor.email}</p>
-                                  </div>
+            // Modal Component
+            const Modal = ({ type, item }) => (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    {type === 'addDonor' && 'Add New Donor'}
+                                    {type === 'editDonor' && 'Edit Donor'}
+                                    {type === 'addRequest' && 'New Blood Request'}
+                                    {type === 'viewDetails' && 'Request Details'}
+                                    {type === 'addStock' && 'Add Blood Stock'}
+                                </h2>
+                                <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
+                                    <i data-lucide="x-circle" className="w-6 h-6"></i>
+                                </button>
+                            </div>
+
+                            {(type === 'addDonor' || type === 'editDonor') && (
+                                <form onSubmit={handleSaveDonor} className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                            <input name="name" type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.name} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Blood Type</label>
+                                            <select name="blood" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.blood}>
+                                                {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                            <input name="phone" type="tel" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.phone} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                            <input name="email" type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.email} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                            <input name="location" type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.location} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Last Donation</label>
+                                            <input name="lastDonation" type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" defaultValue={item?.lastDonation} />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        <button type="submit" className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                                            {type === 'addDonor' ? 'Add Donor' : 'Update Donor'}
+                                        </button>
+                                        <button type="button" onClick={closeModal} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+
+                            {type === 'addRequest' && (
+                                <form onSubmit={handleAddRequest} className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
+                                            <input name="patient" type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Blood Type</label>
+                                            <select name="blood" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                                                {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Units Needed</label>
+                                            <input name="units" type="number" required min="1" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Hospital</label>
+                                            <input name="hospital" type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                                        <textarea name="notes" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" rows="3"></textarea>
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        <button type="submit" className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                                            Submit Request
+                                        </button>
+                                        <button type="button" onClick={closeModal} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+
+                            {type === 'addStock' && (
+                                <form onSubmit={handleAddStockSubmit} className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Blood Type</label>
+                                            <select name="blood_type" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                                                {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Units to Add</label>
+                                            <input name="units" type="number" required min="1" step="0.1" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        <button type="submit" className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                                            Add Stock
+                                        </button>
+                                        <button type="button" onClick={closeModal} className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+
+                            {type === 'viewDetails' && item && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600">Patient Name</p>
+                                            <p className="font-semibold">{item.patient}</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600">Blood Type</p>
+                                            <p className="font-semibold text-red-600">{item.blood}</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600">Units Required</p>
+                                            <p className="font-semibold">{item.units} units</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600">Hospital</p>
+                                            <p className="font-semibold">{item.hospital}</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600">Contact</p>
+                                            <p className="font-semibold">{item.contact}</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600">Status</p>
+                                            <p className="font-semibold">{item.status}</p>
+                                        </div>
+                                    </div>
+                                    {item.status === 'pending' && (
+                                        <div className="flex gap-3 mt-6">
+                                            <button onClick={() => handleApproveRequest(item.id)} className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
+                                                <i data-lucide="check-circle" className="w-5 h-5"></i> Approve
+                                            </button>
+                                            <button onClick={() => handleRejectRequest(item.id)} className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2">
+                                                <i data-lucide="x-circle" className="w-5 h-5"></i> Reject
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg">{donor.blood}</span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <i data-lucide="phone" className="w-4 h-4"></i>
-                                  <span className="text-sm">{donor.phone}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <i data-lucide="map-pin" className="w-4 h-4"></i>
-                                  <span className="text-sm">{donor.location}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{donor.lastDonation || 'N/A'}</td>
-                              <td className="px-6 py-4">
-                                <span className="px-3 py-1 bg-green-100 text-green-700 font-semibold rounded-lg text-sm">
-                                  {donor.totalDonations} times
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => openModal('editDonor', donor)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                  >
-                                    <i data-lucide="edit" className="w-4 h-4"></i>
-                                  </button>
-                                  <button className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition">
-                                    <i data-lucide="eye" className="w-4 h-4"></i>
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteDonor(donor.id)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                  >
-                                    <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                            )}
+                        </div>
                     </div>
-                  )}
                 </div>
-
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <p>Showing {filteredDonors.length} donors</p>
-                  <div className="flex gap-2">
-                    <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">Previous</button>
-                    <button className="px-4 py-2 bg-red-600 text-white rounded-lg">1</button>
-                    <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">Next</button>
-                  </div>
-                </div>
-              </div>
             );
-          };
 
-          // Inventory Page Component
-          const InventoryPage = () => (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium shadow-md">
-                    <i data-lucide="upload" className="w-5 h-5"></i> Add Stock
-                  </button>
-                  <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-medium shadow-md">
-                    <i data-lucide="download" className="w-5 h-5"></i> Export Report
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <i data-lucide="clock" className="w-4 h-4"></i>
-                  <span>Last updated: {new Date().toLocaleTimeString()}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-6">
-                {inventory.map((item, index) => (
-                  <div key={index} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold ${
-                        item.units < 20 ? 'bg-red-600' : item.units < 30 ? 'bg-orange-500' : 'bg-green-500'
-                      }`}>
-                        {item.blood}
-                      </div>
-                      <div className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-                        item.units < 20 ? 'bg-red-100 text-red-700' : item.units < 30 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
-                      }`}>
-                        {item.units < 20 ? 'Critical' : item.units < 30 ? 'Low' : 'Good'}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Available Units</span>
-                        <span className="text-2xl font-bold text-gray-800">{item.units}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Expiring Soon</span>
-                        <span className="text-sm font-semibold text-orange-600">{item.expiring} units</span>
-                      </div>
-                      <div className="pt-3 border-t border-gray-200">
-                        <p className="text-xs text-gray-500">Last updated: {item.lastUpdated}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-6">Stock History & Analytics</h3>
-                <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-                  <p className="text-gray-500">Chart visualization would appear here</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <i data-lucide="alert-triangle" className="text-orange-500 w-5 h-5"></i>
-                    Expiring Soon
-                  </h3>
-                  <div className="space-y-3">
-                    {inventory.filter(item => item.expiring > 0).map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            // Sidebar Component
+            const Sidebar = () => (
+                <div className="w-64 bg-gradient-to-b from-red-600 to-red-700 text-white h-screen flex flex-col shadow-2xl">
+                    <div className="p-6 border-b border-red-500">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold">
-                            {item.blood}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{item.blood} Type</p>
-                            <p className="text-sm text-gray-600">{item.expiring} units in 7 days</p>
-                          </div>
+                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                                <i data-lucide="droplet" className="text-red-600 w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold">BloodBank</h1>
+                                <p className="text-xs text-red-100">Management System</p>
+                            </div>
                         </div>
-                        <button className="px-3 py-1 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition">
-                          Notify
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <i data-lucide="trending-up" className="text-blue-500 w-5 h-5"></i>
-                    Most Requested
-                  </h3>
-                  <div className="space-y-3">
-                    {inventory.sort((a, b) => b.units - a.units).slice(0, 5).map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
-                            {item.blood}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{item.blood} Type</p>
-                            <p className="text-sm text-gray-600">High demand</p>
-                          </div>
+                    <nav className="flex-1 p-4">
+                        {[
+                            { id: 'dashboard', icon: 'activity', label: 'Dashboard' },
+                            { id: 'donors', icon: 'users', label: 'Donors' },
+                            { id: 'inventory', icon: 'package', label: 'Inventory' },
+                            { id: 'requests', icon: 'file-text', label: 'Requests' }
+                        ].map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => setCurrentPage(item.id)}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition ${
+                                    currentPage === item.id ? 'bg-white text-red-600 shadow-lg' : 'hover:bg-red-500'
+                                }`}
+                            >
+                                <i data-lucide={item.icon} className="w-5 h-5"></i>
+                                <span className="font-medium">{item.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+
+                    <div className="p-4 border-t border-red-500">
+                        <a href="/logout" className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500 transition">
+                            <i data-lucide="log-out" className="w-5 h-5"></i>
+                            <span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+            );
+
+            // Header Component
+            const Header = () => (
+                <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800 capitalize">{currentPage}</h2>
+                            <p className="text-sm text-gray-500">
+                                {currentPage === 'dashboard' && 'Overview of blood bank operations'}
+                                {currentPage === 'donors' && 'Manage donor information and records'}
+                                {currentPage === 'inventory' && 'Monitor blood stock and inventory'}
+                                {currentPage === 'requests' && 'Handle blood requests and approvals'}
+                            </p>
                         </div>
-                        <span className="text-blue-600 font-semibold">{item.units} units</span>
-                      </div>
-                    ))}
-                  </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                                    <i data-lucide="bell" className="w-5 h-5"></i>
+                                    {notifications > 0 && (
+                                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                                    )}
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+                                <div className="text-right">
+                                    <p className="text-sm font-medium text-gray-700">Admin User</p>
+                                    <p className="text-xs text-gray-500">admin@bloodbank.com</p>
+                                </div>
+                                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-bold">
+                                    A
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-              </div>
-            </div>
-          );
+            );
 
-          // Requests Page Component
-          const RequestsPage = () => {
-            const filteredRequests = requests;
-
-            return (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="relative flex-1 max-w-md">
-                    <i data-lucide="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
-                    <input
-                      type="text"
-                      placeholder="Search by patient or hospital..."
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    onClick={() => openModal('addRequest')}
-                    className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium shadow-md"
-                  >
-                    <i data-lucide="plus" className="w-5 h-5"></i> New Request
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <i data-lucide="clock" className="text-yellow-600 w-5 h-5"></i>
-                      </div>
-                      <h3 className="font-semibold text-gray-700">Pending</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-800">{requests.filter(r => r.status === 'pending').length}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <i data-lucide="check-circle" className="text-green-600 w-5 h-5"></i>
-                      </div>
-                      <h3 className="font-semibold text-gray-700">Approved</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-800">{requests.filter(r => r.status === 'approved' || r.status === 'fulfilled').length}</p>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                        <i data-lucide="alert-triangle" className="text-red-600 w-5 h-5"></i>
-                      </div>
-                      <h3 className="font-semibold text-gray-700">Total</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-800">{requests.length}</p>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <i data-lucide="refresh-cw" className="animate-spin text-red-600 w-8 h-8"></i>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Patient</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Blood Type</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Units</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Hospital</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {filteredRequests.map(req => (
-                            <tr key={req.id} className="hover:bg-gray-50 transition">
-                              <td className="px-6 py-4">
+            // Dashboard Component
+            const Dashboard = () => (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-4 gap-6">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
+                            <div className="flex justify-between items-start mb-4">
                                 <div>
-                                  <p className="font-medium text-gray-800">{req.patient}</p>
-                                  <p className="text-sm text-gray-500">{req.contact}</p>
+                                    <p className="text-blue-100 text-sm">Total Donors</p>
+                                    <h3 className="text-4xl font-bold mt-2">{stats.totalDonors || 0}</h3>
                                 </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg">{req.blood}</span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="font-semibold text-gray-800">{req.units} units</span>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{req.hospital}</td>
-                              <td className="px-6 py-4">
-                                <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-                                  req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                  req.status === 'approved' || req.status === 'fulfilled' ? 'bg-green-100 text-green-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {req.status.toUpperCase()}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => openModal('viewDetails', req)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                  >
-                                    <i data-lucide="eye" className="w-4 h-4"></i>
-                                  </button>
-                                  {req.status === 'pending' && (
-                                    <>
-                                      <button
-                                        onClick={() => handleApproveRequest(req.id)}
-                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                                      >
-                                        <i data-lucide="check-circle" className="w-4 h-4"></i>
-                                      </button>
-                                      <button
-                                        onClick={() => handleRejectRequest(req.id)}
-                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                      >
-                                        <i data-lucide="x-circle" className="w-4 h-4"></i>
-                                      </button>
-                                    </>
-                                  )}
+                                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+                                    <i data-lucide="users" className="w-6 h-6"></i>
                                 </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          };
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-blue-100">
+                                <i data-lucide="trending-up" className="w-4 h-4"></i>
+                                <span>+12% from last month</span>
+                            </div>
+                        </div>
 
-          // Main Return
-          return (
-            <div className="flex h-screen bg-gray-100">
-              <Sidebar />
-              <div className="flex-1 overflow-y-auto">
-                <Header />
-                <div className="p-8">
-                  {currentPage === 'dashboard' && <Dashboard />}
-                  {currentPage === 'donors' && <DonorsPage />}
-                  {currentPage === 'inventory' && <InventoryPage />}
-                  {currentPage === 'requests' && <RequestsPage />}
+                        <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-xl shadow-lg">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-red-100 text-sm">Units in Stock</p>
+                                    <h3 className="text-4xl font-bold mt-2">{stats.unitsInStock || 0}</h3>
+                                </div>
+                                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+                                    <i data-lucide="droplet" className="w-6 h-6"></i>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-red-100">
+                                <i data-lucide="alert-triangle" className="w-4 h-4"></i>
+                                <span>{stats.criticalStock || 0} types critical</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-6 rounded-xl shadow-lg">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-yellow-100 text-sm">Pending Requests</p>
+                                    <h3 className="text-4xl font-bold mt-2">{stats.pendingRequests || 0}</h3>
+                                </div>
+                                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+                                    <i data-lucide="file-text" className="w-6 h-6"></i>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-yellow-100">
+                                <i data-lucide="clock" className="w-4 h-4"></i>
+                                <span>2 urgent</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-xl shadow-lg">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-green-100 text-sm">Donations (Month)</p>
+                                    <h3 className="text-4xl font-bold mt-2">{stats.donationsThisMonth || 0}</h3>
+                                </div>
+                                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+                                    <i data-lucide="trending-up" className="w-6 h-6"></i>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-green-100">
+                                <i data-lucide="trending-up" className="w-4 h-4"></i>
+                                <span>+8% from last month</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-md p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <i data-lucide="alert-triangle" className="text-red-600 w-5 h-5"></i>
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-800">Critical Stock Alerts</h3>
+                            </div>
+                            <button className="text-red-600 hover:text-red-700 font-medium text-sm">View All</button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* The error was here. It's safe now because criticalStock is guaranteed to be an array. */}
+                            {criticalStock.map((item, index) => (
+                                <div key={index} className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">
+                                            {item.blood}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-800">{item.blood} Blood Type</p>
+                                            <p className="text-sm text-gray-600">{item.units} units remaining • {item.expiring} units expiring soon</p>
+                                        </div>
+                                    </div>
+                                    <span className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg">
+                                        Critical
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4">Recent Donations</h3>
+                            <div className="space-y-3">
+                                {recentDonations.map((donor, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                                                {donor.name?.charAt(0) || 'D'}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-800">{donor.name}</p>
+                                                <p className="text-sm text-gray-500">{donor.blood} • {donor.lastDonation}</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-green-600 text-sm font-medium">Completed</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4">Upcoming Expirations</h3>
+                            <div className="space-y-3">
+                                {expiringStock.map((item, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 font-bold">
+                                                {item.blood}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-800">{item.blood} Blood Type</p>
+                                                <p className="text-sm text-gray-500">{item.expiring} units expiring in 7 days</p>
+                                            </div>
+                                        </div>
+                                        <i data-lucide="clock" className="text-orange-500 w-5 h-5"></i>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-              </div>
-              {showModal && <Modal type={modalType} item={selectedItem} />}
-            </div>
-          );
+            );
+
+            // Donors Page Component
+            const DonorsPage = () => {
+                const filteredDonors = donors;
+
+                const handleSearchChange = (e) => {
+                    const value = e.target.value;
+                    setSearchQuery(value);
+                };
+
+                return (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 flex-1">
+                                <div className="relative flex-1 max-w-md">
+                                    <i data-lucide="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                                    <input
+                                        type="text"
+                                        placeholder="Search donors by name or email..."
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                        value={searchQuery}
+                                        onChange={handleSearchChange}
+                                    />
+                                </div>
+                                <select
+                                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    value={selectedBloodType}
+                                    onChange={(e) => setSelectedBloodType(e.target.value)}
+                                >
+                                    <option value="all">All Blood Types</option>
+                                    {bloodTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                                </select>
+                            </div>
+                            <button
+                                onClick={() => openModal('addDonor')}
+                                className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium shadow-md"
+                            >
+                                <i data-lucide="plus" className="w-5 h-5"></i> Add Donor
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <i data-lucide="refresh-cw" className="animate-spin text-red-600 w-8 h-8"></i>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Donor</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Blood Type</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Donation</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {filteredDonors.map(donor => (
+                                                <tr key={donor.id} className="hover:bg-gray-50 transition">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                                                                {donor.name?.charAt(0) || 'D'}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-gray-800">{donor.name}</p>
+                                                                <p className="text-sm text-gray-500">{donor.email}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg">{donor.blood}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2 text-gray-600">
+                                                            <i data-lucide="phone" className="w-4 h-4"></i>
+                                                            <span className="text-sm">{donor.phone}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2 text-gray-600">
+                                                            <i data-lucide="map-pin" className="w-4 h-4"></i>
+                                                            <span className="text-sm">{donor.location}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{donor.lastDonation || 'N/A'}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-3 py-1 bg-green-100 text-green-700 font-semibold rounded-lg text-sm">
+                                                            {donor.totalDonations} times
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => openModal('editDonor', donor)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                            >
+                                                                <i data-lucide="edit" className="w-4 h-4"></i>
+                                                            </button>
+                                                            <button className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition">
+                                                                <i data-lucide="eye" className="w-4 h-4"></i>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDeleteDonor(donor.id)}
+                                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                            >
+                                                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                            <p>Showing {filteredDonors.length} donors</p>
+                            <div className="flex gap-2">
+                                <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">Previous</button>
+                                <button className="px-4 py-2 bg-red-600 text-white rounded-lg">1</button>
+                                <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Inventory Page Component
+            const InventoryPage = () => (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={handleAddStock}
+                                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium shadow-md"
+                            >
+                                <i data-lucide="upload" className="w-5 h-5"></i> Add Stock
+                            </button>
+                            <button 
+                                onClick={handleExportInventory}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-medium shadow-md"
+                            >
+                                <i data-lucide="download" className="w-5 h-5"></i> Export Report
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <i data-lucide="clock" className="w-4 h-4"></i>
+                            <span>Last updated: {new Date().toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-6">
+                        {inventory.map((item, index) => (
+                            <div key={index} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold ${
+                                        item.units < 20 ? 'bg-red-600' : item.units < 30 ? 'bg-orange-500' : 'bg-green-500'
+                                    }`}>
+                                        {item.blood}
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                                        item.units < 20 ? 'bg-red-100 text-red-700' : item.units < 30 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                                    }`}>
+                                        {item.units < 20 ? 'Critical' : item.units < 30 ? 'Low' : 'Good'}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-600">Available Units</span>
+                                        <span className="text-2xl font-bold text-gray-800">{item.units}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-600">Expiring Soon</span>
+                                        <span className="text-sm font-semibold text-orange-600">{item.expiring} units</span>
+                                    </div>
+                                    <div className="pt-3 border-t border-gray-200">
+                                        <p className="text-xs text-gray-500">Last updated: {item.lastUpdated}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-md p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-6">Stock History & Analytics</h3>
+                        <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+                            <p className="text-gray-500">Chart visualization would appear here</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="alert-triangle" className="text-orange-500 w-5 h-5"></i>
+                                Expiring Soon
+                            </h3>
+                            <div className="space-y-3">
+                                {inventory.filter(item => item.expiring > 0).map((item, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                                {item.blood}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-800">{item.blood} Type</p>
+                                                <p className="text-sm text-gray-600">{item.expiring} units in 7 days</p>
+                                            </div>
+                                        </div>
+                                        <button className="px-3 py-1 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition">
+                                            Notify
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="trending-up" className="text-blue-500 w-5 h-5"></i>
+                                Most Requested
+                            </h3>
+                            <div className="space-y-3">
+                                {inventory.sort((a, b) => b.units - a.units).slice(0, 5).map((item, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                                {item.blood}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-800">{item.blood} Type</p>
+                                                <p className="text-sm text-gray-600">High demand</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-blue-600 font-semibold">{item.units} units</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Requests Page Component
+            const RequestsPage = () => {
+                const filteredRequests = requests;
+
+                return (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div className="relative flex-1 max-w-md">
+                                <i data-lucide="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                                <input
+                                    type="text"
+                                    placeholder="Search by patient or hospital..."
+                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={() => openModal('addRequest')}
+                                className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium shadow-md"
+                            >
+                                <i data-lucide="plus" className="w-5 h-5"></i> New Request
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="bg-white rounded-xl shadow-md p-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                        <i data-lucide="clock" className="text-yellow-600 w-5 h-5"></i>
+                                    </div>
+                                    <h3 className="font-semibold text-gray-700">Pending</h3>
+                                </div>
+                                <p className="text-3xl font-bold text-gray-800">{requests.filter(r => r.status === 'pending').length}</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-md p-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                        <i data-lucide="check-circle" className="text-green-600 w-5 h-5"></i>
+                                    </div>
+                                    <h3 className="font-semibold text-gray-700">Approved</h3>
+                                </div>
+                                <p className="text-3xl font-bold text-gray-800">{requests.filter(r => r.status === 'approved' || r.status === 'fulfilled').length}</p>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-md p-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                        <i data-lucide="alert-triangle" className="text-red-600 w-5 h-5"></i>
+                                    </div>
+                                    <h3 className="font-semibold text-gray-700">Total</h3>
+                                </div>
+                                <p className="text-3xl font-bold text-gray-800">{requests.length}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <i data-lucide="refresh-cw" className="animate-spin text-red-600 w-8 h-8"></i>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Patient</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Blood Type</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Units</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Hospital</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {filteredRequests.map(req => (
+                                                <tr key={req.id} className="hover:bg-gray-50 transition">
+                                                    <td className="px-6 py-4">
+                                                        <div>
+                                                            <p className="font-medium text-gray-800">{req.patient}</p>
+                                                            <p className="text-sm text-gray-500">{req.contact}</p>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg">{req.blood}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="font-semibold text-gray-800">{req.units} units</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{req.hospital}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                                                            req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                            req.status === 'approved' || req.status === 'fulfilled' ? 'bg-green-100 text-green-700' :
+                                                            'bg-gray-100 text-gray-700'
+                                                        }`}>
+                                                            {req.status.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => openModal('viewDetails', req)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                            >
+                                                                <i data-lucide="eye" className="w-4 h-4"></i>
+                                                            </button>
+                                                            {req.status === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleApproveRequest(req.id)}
+                                                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                                                                    >
+                                                                        <i data-lucide="check-circle" className="w-4 h-4"></i>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleRejectRequest(req.id)}
+                                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                                    >
+                                                                        <i data-lucide="x-circle" className="w-4 h-4"></i>
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            // Main Return
+            return (
+                <div className="flex h-screen bg-gray-100">
+                    <Sidebar />
+                    <div className="flex-1 overflow-y-auto">
+                        <Header />
+                        <div className="p-8">
+                            {currentPage === 'dashboard' && <Dashboard />}
+                            {currentPage === 'donors' && <DonorsPage />}
+                            {currentPage === 'inventory' && <InventoryPage />}
+                            {currentPage === 'requests' && <RequestsPage />}
+                        </div>
+                    </div>
+                    {showModal && <Modal type={modalType} item={selectedItem} />}
+                </div>
+            );
         };
 
         // Render App
