@@ -1,7 +1,7 @@
 import pymysql
 pymysql.install_as_MySQLdb()
 
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, make_response
 from flask_mysqldb import MySQL
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,20 +12,23 @@ import traceback
 # --- FLASK APP SETUP ---
 app = Flask(__name__)
 
-# IMPORTANT: Set secret key BEFORE configuring CORS
+# CRITICAL: Set secret key BEFORE configuring CORS
 app.secret_key = 'your_strong_secret_key_here_for_security_12345'
 
-# Configure session cookie settings
+# Configure session cookie settings - CRITICAL FOR SESSION PERSISTENCE
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_COOKIE_PATH'] = '/'
+app.config['SESSION_TYPE'] = 'filesystem'
 
-# Enable CORS - MUST support credentials
+# Enable CORS - CRITICAL: Must expose cookies properly
 CORS(app, 
      supports_credentials=True, 
-     origins=["http://localhost:5000", "http://127.0.0.1:5000"],
-     allow_headers=["Content-Type"],
+     resources={r"/api/*": {"origins": "*"}},
+     allow_headers=["Content-Type", "Authorization"],
+     expose_headers=["Set-Cookie"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # MySQL Configuration
@@ -37,15 +40,29 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
 mysql = MySQL(app)
 
+# --- CRITICAL: After-request handler to ensure cookies are sent ---
+@app.after_request
+def after_request(response):
+    # Allow credentials in CORS requests
+    origin = request.headers.get('Origin')
+    if origin:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
 # --- DECORATORS & AUTH ---
 def login_required(f):
     """Decorator to check if user is logged in."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Check if user_id exists in session
+        print(f"🔍 Checking auth for {request.path}")
+        print(f"   Session: {dict(session)}")
+        print(f"   Has user_id: {'user_id' in session}")
+        
         if 'user_id' not in session:
             print(f"❌ Unauthorized access attempt to {request.path}")
-            print(f"   Session data: {dict(session)}")
             if request.path.startswith('/api'):
                 return jsonify({'success': False, 'message': 'Unauthorized - Please login'}), 401
             return redirect(url_for('login'))
@@ -53,20 +70,6 @@ def login_required(f):
         print(f"✅ Authorized user {session.get('username')} accessing {request.path}")
         return f(*args, **kwargs)
     return decorated_function
-
-def role_required(required_role):
-    """Decorator to check if user has the required role."""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            user_role = session.get('role')
-            if user_role == 'admin':
-                return f(*args, **kwargs)
-            if user_role != required_role:
-                return jsonify({'success': False, 'message': 'Permission denied'}), 403
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
 
 # --- BASE ROUTES ---
 @app.route('/')
@@ -91,16 +94,22 @@ def login():
             cur.close()
 
             if user:
+                # Clear existing session
+                session.clear()
+                
+                # Set session as permanent FIRST
+                session.permanent = True
+                
                 # Set session data
-                session.clear()  # Clear any existing session
                 session['user_id'] = user['user_id']
                 session['username'] = user['username']
                 session['role'] = user['role']
-                session.permanent = True  # Make session permanent (24 hours)
+                
+                # Force session to save
+                session.modified = True
                 
                 print(f"✅ Login successful for {username}")
-                print(f"   Session ID: {session.get('user_id')}")
-                print(f"   Role: {session.get('role')}")
+                print(f"   Session created: user_id={session['user_id']}, role={session['role']}")
                 
                 return jsonify({
                     'success': True, 
@@ -148,7 +157,6 @@ def test_api():
         db = cur.fetchone()
         cur.close()
         
-        # Check session
         session_info = {
             'logged_in': 'user_id' in session,
             'username': session.get('username'),
@@ -187,20 +195,16 @@ def dashboard_stats():
     print("📊 Dashboard stats requested")
     cur = mysql.connection.cursor()
     try:
-        # Total Donors
         cur.execute("SELECT COUNT(DISTINCT Donor_ID) as total_donors FROM Donors")
         total_donors = cur.fetchone()['total_donors'] or 0
         
-        # Total Units
         cur.execute("SELECT SUM(units_available) as total_units FROM Blood_Stock WHERE component_type = 'Whole Blood'")
         total_units_result = cur.fetchone()
         total_units = int(total_units_result['total_units']) if total_units_result['total_units'] else 0
         
-        # Pending Requests
         cur.execute("SELECT COUNT(*) as pending_requests FROM Hospital_Requests WHERE Status = 'Pending'")
         pending_requests = cur.fetchone()['pending_requests'] or 0
         
-        # Donations This Month
         cur.execute("""
             SELECT COUNT(*) as donations_month 
             FROM Donations 
@@ -209,7 +213,6 @@ def dashboard_stats():
         """)
         donations_month = cur.fetchone()['donations_month'] or 0
         
-        # Critical Stock
         cur.execute("SELECT COUNT(*) as critical_stock FROM Blood_Stock WHERE units_available < 20 AND component_type = 'Whole Blood'")
         critical_stock = cur.fetchone()['critical_stock'] or 0
         
@@ -265,19 +268,43 @@ def recent_donations():
     print("📝 Recent donations requested")
     cur = mysql.connection.cursor()
     try:
-        cur.execute("""
-            SELECT 
-                d.Name as name,
-                d.Blood_Group as blood,
-                DATE_FORMAT(don.Donation_Date, '%%Y-%%m-%%d') as lastDonation
-            FROM Donations don
-            JOIN Donors d ON don.Donor_ID = d.Donor_ID
-            ORDER BY don.Donation_Date DESC
-            LIMIT 5
-        """)
-        donations = cur.fetchall()
-        print(f"✅ Found {len(donations)} recent donations")
-        return jsonify(donations)
+        # First check if we have any donations
+        cur.execute("SELECT COUNT(*) as count FROM Donations")
+        count_result = cur.fetchone()
+        donation_count = count_result['count'] if count_result else 0
+        
+        print(f"   Total donations in DB: {donation_count}")
+        
+        if donation_count > 0:
+            cur.execute("""
+                SELECT 
+                    d.Name as name,
+                    d.Blood_Group as blood,
+                    DATE_FORMAT(don.Donation_Date, '%%Y-%%m-%%d') as lastDonation
+                FROM Donations don
+                JOIN Donors d ON don.Donor_ID = d.Donor_ID
+                ORDER BY don.Donation_Date DESC
+                LIMIT 5
+            """)
+            donations = cur.fetchall()
+            print(f"✅ Found {len(donations)} recent donations")
+            return jsonify(donations)
+        else:
+            # If no donations, show recent donors instead
+            print("   No donations found, showing recent donors")
+            cur.execute("""
+                SELECT 
+                    Name as name,
+                    Blood_Group as blood,
+                    COALESCE(DATE_FORMAT(Last_Donation_Date, '%%Y-%%m-%%d'), 'Never') as lastDonation
+                FROM Donors
+                ORDER BY Donor_ID DESC
+                LIMIT 5
+            """)
+            recent_donors = cur.fetchall()
+            print(f"✅ Found {len(recent_donors)} recent donors")
+            return jsonify(recent_donors)
+            
     except Exception as e:
         print(f"❌ Error in recent_donations: {str(e)}")
         traceback.print_exc()
